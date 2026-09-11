@@ -141,6 +141,7 @@ footer{color:var(--muted);font-size:11px;padding:14px;text-align:center}
     <button data-tab="ops" class="on">🗓 Operação</button>
     <button data-tab="hoje">📌 Hoje</button>
     <button data-tab="fin">💰 Financeiro</button>
+    <button data-tab="rec">🔄 Conciliação <span id="recBadge"></span></button>
   </div>
   <section id="tab-ops">
     <div class="tl-wrap"><div class="tl" id="tl"></div></div>
@@ -155,6 +156,17 @@ footer{color:var(--muted);font-size:11px;padding:14px;text-align:center}
       <div class="card"><h3>Previsão futura (confirmadas)</h3><div id="revFut"></div></div>
     </div>
     <div class="card" style="margin-top:8px"><h3>Detalhamento</h3><div style="overflow-x:auto"><table class="fin" id="finTable"></table></div></div>
+  </section>
+  <section id="tab-rec" style="display:none">
+    <div class="card">
+      <h3>🔄 Conciliação PMS ↔ GCAL</h3>
+      <div style="font-size:13px;color:var(--muted)">Compara o app com o calendário mestre, passa as divergências por revisão LLM e separa o que aplica sozinho do que precisa da tua confirmação.</div>
+      <div class="acts" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="bRecRun">▶ Conciliar agora</button>
+        <button class="btn sec" id="bRecAuto" style="display:none"></button>
+      </div>
+      <div id="recOut" style="margin-top:10px;font-size:13px">Nunca conciliado neste dispositivo.</div>
+    </div>
   </section>
   <div class="toolbar" style="margin-top:10px">
     <button class="btn sec" id="bExport">⬇ Exportar JSON</button>
@@ -265,10 +277,10 @@ function SEED(){return [
  R('5077689913','Jamile Santana Lima','2026-09-04','2026-09-07','Q8','Booking',816,0,'checkout','2 adultos',{}),
  R('5833390567','Julio Francisco','2026-09-05','2026-09-07','Q3','Booking',507.50,0,'checkout','2 adultos',{obs:'Alocado Q3 (regra 3-4-5).'}),
  R('5624842510','Lennart Kocheise','2026-09-07','2026-09-10','Q8','Booking',1020,0,'checkout','2 adultos + 2 crianças',{}),
- R('6550233808','Bruna Naiane A. Santos','2026-09-10','2026-09-15','Q3','Booking',597.80,0,'hospedado','2 adultos',{phone:'71999900011',obs:'Café incluso (Booking). Alocada Q3 (regra 3-4-5).',eta:'15h',cleaning:'Limpo · check-in feito'}),
+ R('6550233808','Bruna Naiane Alexandrino Santos','2026-09-10','2026-09-15','Q3','Booking',597.80,0,'hospedado','2 adultos',{phone:'71999900011',obs:'Café incluso (Booking). Alocada Q3 (regra 3-4-5).',eta:'15h',cleaning:'Limpo · check-in feito'}),
  R('6438756876','Augusto Rinque','2026-09-15','2026-09-18','Q8','Booking',816,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
- R('DIR-AMIGOPAI','Amigo do pai (a confirmar)','2026-09-19','2026-09-27','Q2','Direta',1350,0,'pre','A confirmar',{obs:'Diária R$150 x 9. Sinal a combinar. Café incluso (manual).'}),
- R('6322042906','João Ricardo C. Barbedo','2026-09-19','2026-09-23','Q8','Booking',1088,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
+ R('DIR-AMIGOPAI','Amigo do pai (nome a confirmar)','2026-09-19','2026-09-27','Q2','Direta',1350,0,'pre','A confirmar',{obs:'Diária R$150 x 9. Sinal a combinar. Café incluso (manual).'}),
+ R('6322042906','João Ricardo Cunha Barbedo','2026-09-19','2026-09-23','Q8','Booking',1088,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
  R('DIR-GRAZIELX','Graziella Xavier de Barros','2026-09-21','2026-09-28','Q6','Direta',1650,650,'confirmada','2 adultos',{phone:'71988800022',obs:'CPF + email no GCAL. Saldo R$1000 no check-in.',pay:'PIX'}),
  R('DIR-TATIANE','Tatiane','2026-09-25','2026-09-28','Q8','Direta',660,330,'confirmada','3 pessoas',{obs:'Sinal R$330 ✅. Saldo R$330 no check-in.',pay:'PIX'}),
  R('5553787235','Sofia Lobianco','2026-09-29','2026-10-05','Q3','Booking',1501.68,0,'confirmada','2 adultos',{obs:'6 noites. Alocada Q3 (regra 3-4-5).'}),
@@ -290,14 +302,14 @@ function SEED(){return [
  R('DIR-WELLINGT','Wellington','2026-12-26','2027-01-04','Q2','Direta',9100,4550,'confirmada','A confirmar',{obs:'9 diárias. Sinal R$4550 (50%) PIX ✅. Saldo R$4550 no check-in. 🎆 Réveillon.',pay:'PIX'}),
  R('DIR-RAISSAVO-a','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q3','Direta',2750,0,'pre','2 adultos',{obs:'Total R$5500 (2 quartos 1/2). Depósito 50% R$2750 Pix 16/08 — AGUARDANDO. CPF + email no GCAL.',pay:'PIX'}),
  R('DIR-RAISSAVO-b','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q4','Direta',2750,0,'pre','2 adultos',{obs:'Total R$5500 (2 quartos 2/2). Depósito 50% — AGUARDANDO.',pay:'PIX'}),
- R('DIR-RAISSA2','Raissa Voelzke Passarin (2ª)','2027-01-02','2027-01-06','Q5','Direta',2200,1100,'confirmada','2 adultos',{obs:'50% R$1100 Pix 18/08 ✅ + R$1100 no check-in.',pay:'PIX'}),
- R('DIR-LETICIAP','Letícia Poltronieri da Silva','2027-01-02','2027-01-05','Q6','Direta',1650,825,'confirmada','2 adultos',{obs:'Sinal R$825 ✅ (reservas.md). Saldo R$825 no check-in.',pay:'PIX'}),
+ R('DIR-RAISSA2','Raissa Voelzke Passarin (2a reserva)','2027-01-02','2027-01-06','Q5','Direta',2200,1100,'confirmada','2 adultos',{obs:'50% R$1100 Pix 18/08 ✅ + R$1100 no check-in.',pay:'PIX'}),
+ R('DIR-LETICIAP','Letícia Poltronieri da Silva','2027-01-02','2027-01-05','Q6','Direta',1650,825,'confirmada','2 adultos',{obs:'Sinal R$825 ✅ (reservas.md). Saldo R$825 no check-in. ⚠ CONFLITO Q6 c/ Almog 5118172753 (03-07/jan) — realocar um p/ Q4 livre.',pay:'PIX'}),
  R('5033914795','Almog Azari','2027-01-03','2027-01-06','Q8','Booking',1350,0,'confirmada','2 adultos',{obs:'Bangalô com vista mar.'}),
  R('5118172753','Almog Azari','2027-01-03','2027-01-07','Q6','Booking',2800,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar.'}),
  R('6628256918','Kahena Corcini Nantes','2027-01-08','2027-01-12','Q8','Booking',2464,0,'confirmada','2 adultos',{obs:'Tarifa Genius.'}),
  R('6499845521','Laura Ehui','2027-01-09','2027-01-12','Q6','Booking',1650,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar → Q6 (regra Deluxe).'}),
- R('DIR-ROBLEDOF-a','Robledo de Freitas','2027-01-14','2027-01-18','Q6','Direta',3340,3340,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 1/2). Sinal R$3340 (50%) cartão ✅. Saldo R$3340 no check-in. CPF no GCAL.',pay:'Cartão'}),
- R('DIR-ROBLEDOF-b','Robledo de Freitas','2027-01-14','2027-01-18','Q7','Direta',3340,0,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 2/2). Sinal lançado em (1/2) — não somar.',pay:'Cartão'}),
+ R('DIR-ROBLEDOF-a','Robledo de Freitas','2027-01-14','2027-01-19','Q6','Direta',3340,3340,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 1/2). Sinal R$3340 (50%) cartão ✅. Saldo R$3340 no check-in. CPF no GCAL.',pay:'Cartão'}),
+ R('DIR-ROBLEDOF-b','Robledo de Freitas','2027-01-14','2027-01-19','Q7','Direta',3340,0,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 2/2). Sinal lançado em (1/2) — não somar.',pay:'Cartão'}),
  R('6655509099-a','Maria Cristiana S V Pereira','2027-01-16','2027-01-20','Q8','Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 1/2).'}),
  R('6655509099-b','Maria Cristiana S V Pereira','2027-01-16','2027-01-20','Q4','Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 2/2). Alocada Q4 (regra 3-4-5; Q3 ocupada p/ DIR-RAISSAVO? não — RAISSAVO sai 07/jan; Q4 livre).'}),
  R('DIR-GEMMINAF','Gemmina','2027-01-19','2027-01-28','Q6','Direta',4500,2250,'confirmada','2 adultos',{obs:'Argentina. Sinal R$2250 (50%) Pix ✅. Saldo R$2250 no check-in (reais/Pix/cartão — NÃO aceitar dólar espécie). Transfer no GCAL.',pay:'PIX'}),
@@ -307,7 +319,7 @@ function SEED(){return [
  R('5286029133-b','Martin Joecke','2027-02-20','2027-02-22','Q3','Booking',0,0,'confirmada','2 adultos',{obs:'2 quartos (2/2): Q3 p/ regra 3-4-5. Valor lançado em (1/2) — não somar.'}),
  R('5271276885-a','Enrico Vasconcelos','2027-02-22','2027-02-25','Q3','Booking',2542.50,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (1/2): Q3. Total wiki R$2542.50 (1x duplo + 1x deluxe vista-mar).'}),
  R('5271276885-b','Enrico Vasconcelos','2027-02-22','2027-02-25','Q4','Booking',0,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (2/2): Q4. Valor lançado em (1/2) — não somar.'}),
- R('DIR-NINASANT','Nina Santanna','2027-03-06','2027-03-13','Q3','Direta',1260,0,'pre','A confirmar',{obs:'R$180/dia x 7 noites. Sinal R$630 (50%) PENDENTE. Via Instagram. Café ✅.'}),
+ R('DIR-NINASANT','Nina Santanna','2027-03-06','2027-03-14','Q3','Direta',1260,0,'pre','A confirmar',{obs:'R$180/dia x 7 noites. Sinal R$630 (50%) PENDENTE. Via Instagram. Café ✅.'}),
  R('OLIVIA-07','Olivia Gasparello','2026-07-18','2026-07-21','Q3','Direta',360,360,'checkout','1 adulto',{obs:'Sinal R$180 + saldo R$180 pagos.',pay:'PIX'}),
  R('BLOQ-Q4MANUT','🔧 Q4 em manutenção','2026-09-22','2026-10-15','Q4','Direta',0,0,'manutencao','—',{obs:'Q4 Lagosta fora de operação até 15/10. Regra 3-4-5 usa Q3→Q5 nesse período.'}),
  R('BLOQ-Q7','Q7 uso próprio (Diogo)','2026-09-01','2026-12-20','Q7','Direta',0,0,'bloqueio','—',{obs:'Quarto do Diogo. Alugável a partir de 20/dez/26.'})
@@ -580,6 +592,59 @@ function openBlock(){
  $('kSave').onclick=()=>{snap();const br=R('BLOQ-'+Date.now().toString(36).toUpperCase(),$('kT').value==='manutencao'?'🔧 Manutenção '+$('kRoom').value:'⛔ Bloqueio '+$('kRoom').value,$('kCi').value,$('kCo').value,$('kRoom').value||null,'Direta',0,0,$('kT').value,'—',{obs:$('kObs').value});S.res.push(br);save();closeM();render();toast('Quarto bloqueado');
   gcalSync('upsert',br.code,gcalPayload(br)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
 }
+/* ============ CONCILIAÇÃO ============ */
+let REC=null;
+function renderRec(){
+ const box=$('recOut');if(!box)return;
+ if(!REC){box.innerHTML='Nunca conciliado neste dispositivo.';$('recBadge').textContent='';$('bRecAuto').style.display='none';return;}
+ const s=REC.summary;
+ $('recBadge').textContent=s.confirm?('⚠ '+s.confirm):(s.diffs?('✓ '+s.diffs):'');
+ const autoBtn=$('bRecAuto');
+ const autos=(REC.findings||[]).filter(f=>f.verdict==='auto'&&f.apply&&f.apply.fields);
+ if(autos.length){autoBtn.style.display='inline';autoBtn.textContent='⚡ Aplicar '+autos.length+' correções seguras';}
+ else autoBtn.style.display='none';
+ let h='<div style="color:var(--muted);font-size:12px">Última conciliação: '+esc(REC.at||'—')+' · '+(REC.llmOk?('LLM '+(REC.model||'')):('sem LLM: '+esc(REC.llmErr||'')))+'</div>';
+ h+='<div class="kpis" style="margin:8px 0"><div class="kpi"><div class="v">'+s.diffs+'</div><div class="l">divergências</div></div>'
+  +'<div class="kpi"><div class="v">'+s.auto+'</div><div class="l">⚡ auto</div></div>'
+  +'<div class="kpi"><div class="v">'+s.confirm+'</div><div class="l">⚠ precisam de ti</div></div></div>';
+ const cf=(REC.findings||[]).filter(f=>f.verdict==='confirm');
+ const au=(REC.findings||[]).filter(f=>f.verdict==='auto');
+ if(cf.length){h+='<h4 style="color:var(--red)">⚠ Precisam da tua confirmação ('+cf.length+')</h4>';
+  h+=cf.map((f,i)=>'<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><b>'+esc(f.message)+'</b><br><span style="color:var(--muted)">'+esc(f.direction||'revisar')+' · '+esc(f.id)+'</span><br><button class="btn sec" data-recok="'+i+'" style="margin-top:4px">Abrir reserva</button></div>').join('');}
+ if(au.length){h+='<h4 style="color:var(--teal-d)">⚡ Seguras (auto-aplicáveis)</h4>';
+  h+=au.map(f=>'<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12px">✓ '+esc(f.message)+'</div>').join('');}
+ if(!cf.length&&!au.length)h+='<div>✅ Nenhuma divergência — PMS e GCAL idênticos.</div>';
+ box.innerHTML=h;
+ box.querySelectorAll('[data-recok]').forEach(b=>b.onclick=()=>{
+  const f=cf[+b.dataset.recok];closeM();
+  const code=(f.apply&&f.apply.code)||(f.id&&REC.diffs.find(d=>d.id===f.id)||{}).code;
+  if(code&&S.res.find(r=>r.code===code))openDetail(code);else toast('Reserva fora do PMS — ver GCAL');
+ });
+}
+async function runReconcile(){
+ toast('🔄 Conciliando com GCAL…');
+ try{
+  const r=await fetch(syncBase()+'/api/reconcile',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({pms:S.res.map(pickRec),autoApply:true})});
+  REC=await r.json();REC.at=new Date().toLocaleString('pt-BR');
+  if(!REC.ok){toast('⚠ '+(REC.err||'falhou'));return;}
+  renderRec();render();
+  toast(REC.summary.confirm?('⚠ '+REC.summary.confirm+' precisam de ti'):('✅ '+REC.summary.diffs+' divergências, '+REC.summary.auto+' auto'));
+ }catch(e){toast('⚠ Conciliação falhou: '+e);}
+}
+function pickRec(r){return {code:r.code,guest:r.guest,ci:r.ci,co:r.co,room:r.room,channel:r.channel,total:r.total,paid:r.paid,status:r.status,pax:r.pax};}
+function applyAutos(){
+ const autos=(REC.findings||[]).filter(f=>f.verdict==='auto'&&f.apply&&f.apply.fields);
+ if(!autos.length)return;
+ snap();
+ let n=0;
+ autos.forEach(f=>{
+  const r=S.res.find(x=>x.code===f.apply.code);if(!r)return;
+  Object.entries(f.apply.fields).forEach(([k,v])=>{r[k]=v;});n++;
+  if(f.direction==='pms->gcal')gcalSync('upsert',r.code,gcalPayload(r));
+ });
+ save();renderRec();render();toast('⚡ '+n+' correções aplicadas');
+}
 /* ============ BUSCA ============ */
 let qT;$('q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{
  const q=$('q').value.trim().toLowerCase();const box=$('searchRes');
@@ -592,7 +657,7 @@ let qT;$('q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{
 },200);});
 document.addEventListener('click',e=>{if(!e.target.closest('#searchRes')&&e.target.id!=='q')$('searchRes').style.display='none';});
 /* ============ NAV / EVENTOS ============ */
-function render(){renderKPIs();renderAlerts();if(S.tab==='ops')renderTL();if(S.tab==='hoje')renderHoje();if(S.tab==='fin')renderFin();}
+function render(){renderKPIs();renderAlerts();if(S.tab==='ops')renderTL();if(S.tab==='hoje')renderHoje();if(S.tab==='fin')renderFin();if(S.tab==='rec')renderRec();}
 document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{
  const v=b.dataset.range;
  if(v==='custom'){$('dFrom').style.display='inline';$('dTo').style.display='inline';
@@ -606,9 +671,11 @@ $('bUndo').onclick=undo;
 $('bBlock').onclick=()=>openBlock();
 $('bSyncCfg').onclick=()=>openSyncCfg();
 $('bNew').onclick=()=>openNew(null,null);
+$('bRecRun').onclick=()=>runReconcile();
+$('bRecAuto').onclick=()=>applyAutos();
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>activateTab(b.dataset.tab));
 function activateTab(t){S.tab=t;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
- ['ops','hoje','fin'].forEach(k=>$('tab-'+k).style.display=k===t?'block':'none');render();}
+ ['ops','hoje','fin','rec'].forEach(k=>$('tab-'+k).style.display=k===t?'block':'none');render();}
 ['fStatus','fChannel','fRoom','fHideCx'].forEach(id=>$(id).addEventListener('change',render));
 $('q').addEventListener('change',render);
 $('fRoom').innerHTML='<option value="">Quarto: todos</option>'+ROOMS.filter(x=>x.ativo).map(x=>'<option value="'+(x.id||'')+'">'+esc(x.name)+'</option>').join('');
