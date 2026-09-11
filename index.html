@@ -117,6 +117,8 @@ footer{color:var(--muted);font-size:11px;padding:14px;text-align:center}
   </div>
   <button id="bToday">Hoje</button>
   <button class="ghost" id="bUndo" title="Desfazer (Ctrl+Z)">↩ Desfazer</button>
+  <button class="ghost" id="bBlock" title="Bloquear quarto / manutenção">⛔ Bloquear</button>
+  <button class="ghost" id="bSyncCfg" title="Configurar sincronização com Google Calendar">🔗 GCAL</button>
   <button id="bNew">+ Nova reserva</button>
 </header>
 <main>
@@ -174,6 +176,7 @@ footer{color:var(--muted);font-size:11px;padding:14px;text-align:center}
 */
 const LS='pms-morere-v2';
 const ROOMS=[
+ {id:null,name:'⚠ A definir (sem quarto)',cat:'—',cap:0,ativo:true},
  {id:'Q2',name:'Q2 · Standard',cat:'Standard',cap:2,ativo:true},
  {id:'Q3',name:'Q3 · Peguari',cat:'Standard',cap:2,ativo:true},
  {id:'Q4',name:'Q4 · Lagosta',cat:'Standard',cap:2,ativo:true},
@@ -189,6 +192,50 @@ const STATUS={
  hospedado:{l:'Hospedado',i:'◆'},checkout:{l:'Check-out',i:'✓'},cancelada:{l:'Cancelada',i:'✕'},
  bloqueio:{l:'Bloqueio',i:'■'},manutencao:{l:'Manutenção',i:'▲'}
 };
+/* Google Calendar (fonte primaria) — events ligados por codigo.
+   Preenchido em 11/set/2026 a partir do calendario mestre (44 codigos, 48 eventos).
+   MANUT/Diogo (BLOQ-*) sao locais do PMS (sem evento no GCAL). */
+const GCAL_IDS={
+ '5276958152':['3o3l0aqi3mpq54610qb1haem6k'],'5966461908':['ilinuc3lk5a11oucuh0145dvr0'],
+ '5372297171':['oqflhc87jvoluio8n3g9onn6cc'],'5077689913':['fbbq63eqbmebhaupdm26rubhq0'],
+ '5833390567':['fk1jv2q54s8rd613ulvb58stbk'],'5624842510':['6aqri8aqet6gr4kummvc1sl7s8'],
+ '6550233808':['th7fvb5t71onv5uaiscgos8kjk'],'6438756876':['tgpqcfqgpf45pudthg9plm3p48'],
+ 'DIR-AMIGOPAI':['bflq4ovkf20rj6scn0a228qbks'],'6322042906':['shj1tsoa4ebqpumvfb5tv54cm0'],
+ 'DIR-GRAZIELX':['h58ln5moco1s73r4hi94ccm064'],'DIR-TATIANE':['h2m84rc62fh2r9jd37v9i6nuqo'],
+ '5553787235':['ejathbee639i4ek27pokf65oak'],'6758535376':['pqat4bdqv2lmqumjvlgha5l2bk'],
+ '6133651414':['5q0cssnbgsqfuu1qlqeanc7u9s'],'5919780696':['d34op7s332emn9joplovq392mc'],
+ '5643277374':['2kl1e52ohb1frgrt3k9senbu64'],'5350099465':['1fhvr05ippqf8shb5cume6fdf8'],
+ '6833220672':['3opei354q5u6avqr5kd4407un4'],'5666636994':['jlen64js564lhp4pc22rncribk'],
+ '5540340133':['lui3ln1egpntdddl12i93pcuuo'],'5340616788':['kiq67vgtbks7ok26r3v2oaq3v0'],
+ '6144914949':['i8dc59ht607vpshuddgnilj9cs'],'6912465115':['4tjenr3akicmmq62j2mnd0ksbk'],
+ '6840967150':['7i4lo1i7uphvb3hn9rih6epnok'],'6980943444':['_6p144gq46p0jcb9l6l1j6b9k84p3ib9p74p46b9o8crk4dpg6sqkchhj6s'],
+ 'DIR-IZADORAD':['deefvjbea4h5kp718nf3sou01o'],'6137444344':['n3ahiv8o9v5pmds2hqqj5su5a4'],
+ 'DIR-WELLINGT':['q9ihr1u8eo3bkjrkbldch2sd2k'],
+ 'DIR-RAISSAVO-a':['d0bdae0kr6phj2j3huionm26rk'],'DIR-RAISSAVO-b':['nrtbss7vih1138q1ttdc4v4do8'],
+ 'DIR-RAISSA2':['sj28tvdpqqfae9bjt6iinf5sbo'],'DIR-LETICIAP':['snitgokmumh41cgf9kjin17ch4'],
+ '5118172753':['9k0mj5nn5svdh7hht977j860mk'],'5033914795':['jadbt728p1spo57p8g4ppi19a4'],
+ '6628256918':['kacddpm09pcv29spufjh3169s4'],'6499845521':['4q38tjsi2v595qiotd9365cmdo'],
+ 'DIR-ROBLEDOF-a':['97jt98gdq598hahb1d32henh7s'],'DIR-ROBLEDOF-b':['g5agm93bui45m0bp9bnpqcai3c'],
+ '6655509099-a':['5fmt432jq4grodqepilsj8oh5s'],'6655509099-b':['k6ep219e3p9e4kand06vkhgccc'],
+ 'DIR-GEMMINAF':['kctggvk2vdss3u4i3obci1al04'],'5046956112':['lg8j52o87eekgldhs4u7djbec0'],
+ '6773189787':['02bsrvv25ai8q97kj382c744mk'],
+ '5286029133-a':['j67pq91rj1u7ds2t28qgmgdmbs'],'5286029133-b':['ml4lac39usnki07c6boc41inco'],
+ '5271276885-a':['jesli4tal5i0482duh2h9aapqk'],'DIR-NINASANT':['vpcqc4k7iaraeg8va4unv6qs4k']
+};
+/* === SYNC GCAL (via backend proprio — chave Maton NUNCA no frontend) ===
+   Backend: POST /api/sync {op, code, payload} → proxy c/ Authorization.
+   Sem backend configurado o PMS funciona 100% local (sync desabilitado). */
+const SYNC_URL=(localStorage.getItem('pms-sync-url')||'').replace(/\/$/,'');
+function syncOn(){return !!SYNC_URL;}
+async function gcalSync(op,code,payload){
+ if(!syncOn())return {ok:false,off:true};
+ try{const r=await fetch(SYNC_URL+'/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({op,code,payload})});
+  return await r.json();
+ }catch(e){return {ok:false,err:String(e)};}
+}
+/* suite -> texto curto p/ summary do GCAL */
+function suiteShort(s){return {Q2:'Q2',Q3:'Q3 Peguari',Q4:'Q4',Q5:'Q5',Q6:'Q6 Budião',Q7:'Q7',Q8:'Q8 Bangalô',Q9:'Q9'}[s]||s||'A definir';}
 function R(code,guest,ci,co,room,channel,total,paid,status,pax,extra){
   return Object.assign({code,guest,phone:'',ci,co,room,channel,total,paid:paid||0,
     pay:channel==='Booking'?'Repasse Booking (dia 1º)':(channel==='Airbnb'?'Payout Airbnb':'PIX'),
@@ -204,7 +251,7 @@ function SEED(){return [
  R('5624842510','Lennart Kocheise','2026-09-07','2026-09-10','Q8','Booking',1020,0,'checkout','2 adultos + 2 crianças',{}),
  R('6550233808','Bruna Naiane A. Santos','2026-09-10','2026-09-15',null,'Booking',597.80,0,'hospedado','2 adultos',{phone:'71999900011',obs:'Café incluso (Booking). Quarto físico a confirmar.',eta:'15h',cleaning:'Limpo · check-in feito'}),
  R('6438756876','Augusto Rinque','2026-09-15','2026-09-18','Q8','Booking',816,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
- R('DIR-AMIGOPAI','Amigo do pai (a confirmar)','2026-09-19','2026-09-27','Q2','Direta',0,0,'pre','A confirmar',{obs:'A confirmar valor e pax.'}),
+ R('DIR-AMIGOPAI','Amigo do pai (a confirmar)','2026-09-19','2026-09-27','Q2','Direta',1350,0,'pre','A confirmar',{obs:'Diária R$150 x 9. Sinal a combinar. Café incluso (manual).'}),
  R('6322042906','João Ricardo C. Barbedo','2026-09-19','2026-09-23','Q8','Booking',1088,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
  R('DIR-GRAZIELX','Graziella Xavier de Barros','2026-09-21','2026-09-28','Q6','Direta',1650,650,'confirmada','2 adultos',{phone:'71988800022',obs:'CPF + email no GCAL. Saldo R$1000 no check-in.',pay:'PIX'}),
  R('DIR-TATIANE','Tatiane','2026-09-25','2026-09-28','Q8','Direta',660,330,'confirmada','3 pessoas',{obs:'Sinal R$330 ✅. Saldo R$330 no check-in.',pay:'PIX'}),
@@ -224,27 +271,27 @@ function SEED(){return [
  R('6912465115','Vinicius Rocha','2026-12-26','2027-01-02','Q4','Booking',7560,0,'confirmada','2 adultos',{obs:'🎆 Réveillon.'}),
  R('6980943444','Rafael Opice','2026-12-26','2027-01-02','Q8','Booking',8788.50,0,'confirmada','1 adulto',{obs:'🎆 Réveillon.'}),
  R('DIR-IZADORAD','Izadora dos Santos Praça','2026-12-26','2027-01-02','Q3','Direta',9000,4500,'confirmada','2 adultos',{obs:'🎆 Réveillon. Sinal R$4500 PIX ✅.',pay:'PIX'}),
- R('DIR-WELLINGT','Wellington','2026-12-26','2027-01-04','Q2','Direta',9100,0,'confirmada','2 adultos',{obs:'9 diárias. 🎆 Réveillon.'}),
- R('DIR-RAISSAVO-a','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q3','Direta',2750,0,'confirmada','2 adultos',{obs:'Total R$5500 (2 quartos 1/2). CPF + email no GCAL.',pay:'PIX'}),
- R('DIR-RAISSAVO-b','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q4','Direta',2750,0,'confirmada','2 adultos',{obs:'Total R$5500 (2 quartos 2/2).',pay:'PIX'}),
+ R('DIR-WELLINGT','Wellington','2026-12-26','2027-01-04','Q2','Direta',9100,4550,'confirmada','A confirmar',{obs:'9 diárias. Sinal R$4550 (50%) PIX ✅. Saldo R$4550 no check-in. 🎆 Réveillon.',pay:'PIX'}),
+ R('DIR-RAISSAVO-a','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q3','Direta',2750,0,'pre','2 adultos',{obs:'Total R$5500 (2 quartos 1/2). Depósito 50% R$2750 Pix 16/08 — AGUARDANDO. CPF + email no GCAL.',pay:'PIX'}),
+ R('DIR-RAISSAVO-b','Raissa Voelzke Passarin','2027-01-02','2027-01-07','Q4','Direta',2750,0,'pre','2 adultos',{obs:'Total R$5500 (2 quartos 2/2). Depósito 50% — AGUARDANDO.',pay:'PIX'}),
  R('DIR-RAISSA2','Raissa Voelzke Passarin (2ª)','2027-01-02','2027-01-06','Q5','Direta',2200,1100,'confirmada','2 adultos',{obs:'50% R$1100 Pix 18/08 ✅ + R$1100 no check-in.',pay:'PIX'}),
- R('DIR-LETICIAP','Letícia Poltronieri da Silva','2027-01-02','2027-01-05','Q6','Direta',1650,825,'confirmada','2 adultos',{obs:'Sinal R$825 ✅. Saldo R$825 no check-in.',pay:'PIX'}),
+ R('DIR-LETICIAP','Letícia Poltronieri da Silva','2027-01-02','2027-01-05','Q6','Direta',1650,825,'confirmada','2 adultos',{obs:'Sinal R$825 ✅ (reservas.md). Saldo R$825 no check-in.',pay:'PIX'}),
  R('5033914795','Almog Azari','2027-01-03','2027-01-06','Q8','Booking',1350,0,'confirmada','2 adultos',{obs:'Bangalô com vista mar.'}),
  R('5118172753','Almog Azari','2027-01-03','2027-01-07','Q6','Booking',2800,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar.'}),
  R('6628256918','Kahena Corcini Nantes','2027-01-08','2027-01-12','Q8','Booking',2464,0,'confirmada','2 adultos',{obs:'Tarifa Genius.'}),
  R('6499845521','Laura Ehui','2027-01-09','2027-01-12','Q6','Booking',1650,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar.'}),
- R('DIR-ROBLEDOF-a','Robledo de Freitas','2027-01-14','2027-01-19','Q6','Direta',0,0,'pre','2 quartos (Q6+Q7)',{obs:'2 quartos (1/2). Valor a confirmar.'}),
- R('DIR-ROBLEDOF-b','Robledo de Freitas','2027-01-14','2027-01-19','Q7','Direta',0,0,'pre','2 quartos (Q6+Q7)',{obs:'2 quartos (2/2). Valor a confirmar.'}),
+ R('DIR-ROBLEDOF-a','Robledo de Freitas','2027-01-14','2027-01-18','Q6','Direta',3340,3340,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 1/2). Sinal R$3340 (50%) cartão ✅. Saldo R$3340 no check-in. CPF no GCAL.',pay:'Cartão'}),
+ R('DIR-ROBLEDOF-b','Robledo de Freitas','2027-01-14','2027-01-18','Q7','Direta',3340,0,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 2/2). Sinal lançado em (1/2) — não somar.',pay:'Cartão'}),
  R('6655509099-a','Maria Cristiana S V Pereira','2027-01-16','2027-01-20','Q8','Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 1/2).'}),
  R('6655509099-b','Maria Cristiana S V Pereira','2027-01-16','2027-01-20',null,'Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 2/2). Quarto físico a definir.'}),
- R('DIR-GEMMINAF','Gemmina','2027-01-19','2027-01-28','Q6','Direta',0,0,'pre','2 adultos',{obs:'Argentina. Transfer Imbassai→Mor Sala de estaré (contato no GCAL). Valor a confirmar.'}),
+ R('DIR-GEMMINAF','Gemmina','2027-01-19','2027-01-28','Q6','Direta',4500,2250,'confirmada','2 adultos',{obs:'Argentina. Sinal R$2250 (50%) Pix ✅. Saldo R$2250 no check-in (reais/Pix/cartão — NÃO aceitar dólar espécie). Transfer no GCAL.',pay:'PIX'}),
  R('5046956112','Mariana Mazzini','2027-01-26','2027-01-29',null,'Booking',1051.89,0,'confirmada','1 adulto',{}),
  R('6773189787','Martha Slade','2027-01-29','2027-02-02',null,'Booking',3019,0,'confirmada','2 adultos',{}),
  R('5286029133-a','Martin Joecke','2027-02-20','2027-02-22','Q6','Booking',1325.90,0,'confirmada','2 adultos',{obs:'2 quartos (1/2). Valor total no GCAL.'}),
  R('5286029133-b','Martin Joecke','2027-02-20','2027-02-22',null,'Booking',0,0,'confirmada','2 adultos',{obs:'2 quartos (2/2). Valor lançado em (1/2) — não somar.'}),
- R('5271276885-a','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',0,0,'pre','3 adultos',{obs:'2x Quarto Duplo (1/2). Valor a confirmar.'}),
- R('5271276885-b','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',0,0,'pre','3 adultos',{obs:'2x Quarto Duplo (2/2). Valor a confirmar.'}),
- R('DIR-NINASANT','Nina Santanna','2027-03-06','2027-03-14','Q3','Direta',0,0,'pre','A confirmar',{obs:'Via Instagram. Valor a confirmar.'}),
+ R('5271276885-a','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',2542.50,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (1/2). Total wiki R$2542.50 (1x duplo + 1x deluxe vista-mar).'}),
+ R('5271276885-b','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',0,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (2/2). Valor lançado em (1/2) — não somar.'}),
+ R('DIR-NINASANT','Nina Santanna','2027-03-06','2027-03-13','Q3','Direta',1260,0,'pre','A confirmar',{obs:'R$180/dia x 7 noites. Sinal R$630 (50%) PENDENTE. Via Instagram. Café ✅.'}),
  R('OLIVIA-07','Olivia Gasparello','2026-07-18','2026-07-21','Q3','Direta',360,360,'checkout','1 adulto',{obs:'Sinal R$180 + saldo R$180 pagos.',pay:'PIX'}),
  R('BLOQ-Q4SET','🔧 Manutenção Q4','2026-09-22','2026-09-24','Q4','Direta',0,0,'manutencao','—',{obs:'Rejunte banheiro + dedetização.'}),
  R('BLOQ-Q7','Q7 uso próprio (Diogo)','2026-09-01','2026-12-20','Q7','Direta',0,0,'bloqueio','—',{obs:'Quarto do Diogo. Alugável a partir de 20/dez/26.'})
@@ -359,12 +406,43 @@ function renderTL(){
   c.addEventListener('drop',e=>{e.preventDefault();moveRes(e.dataTransfer.getData('text/plain'),c.dataset.room||null,c.dataset.date);});
  });
 }
+function gcalPayload(r){
+ /* summary + description no padrão do calendario mestre */
+ return {
+  summary: r.guest+' — '+r.code+' — '+suiteShort(r.room)+(r.status==='cancelada'?' (CANCELADA)':''),
+  description:
+   'Codigo: '+r.code+'\nPlataforma: '+(r.channel==='Direta'?'Direta':r.channel)+'\nHospede: '+r.guest
+   +'\nCheck-in: '+r.ci+'\nCheck-out: '+r.co+'\nPax: '+r.pax+'\nSuite: '+suiteShort(r.room)
+   +'\nValor total: R$ '+(+r.total||0).toFixed(2)+'\nSinal pago: R$ '+(+r.paid||0).toFixed(2)
+   +(saldo(r)>0?'\nSaldo pendente: R$ '+saldo(r).toFixed(2):'\nSaldo pendente: R$ 0,00 (quitado ✅)')
+   +'\nCafe: '+(r.channel==='Booking'?'✅ incluso (Booking)':r.channel==='Airbnb'?'❌ não incluso (Airbnb)':'✅ incluso (manual)')
+   +(r.phone?'\nTel: '+r.phone:'')+(r.obs?'\nObs: '+r.obs:''),
+  ci: r.ci, co: r.co
+ };
+}
+function openSyncCfg(){
+ const on=syncOn();
+ openM('<h2>🔗 Sincronização Google Calendar</h2>'
+ +'<div style="font-size:13px;color:var(--muted)">Status: '+(on?'<b style="color:green">● ATIVA</b>':'<b style="color:#999">○ local (sem sync)</b>')+'</div>'
+ +'<p style="font-size:13px">Toda alteração de reserva no PMS (criar, mover, editar, cancelar, excluir) '+(on?'<b>reflete automaticamente no GCAL</b>':'<b>vai refletir no GCAL</b> assim que o backend for ligado')+'. Sem backend, o PMS funciona 100% local.</p>'
+ +'<label>URL do backend de sync (ex: https://seu-backend/api)</label><input id="sUrl" placeholder="https://..." value="'+esc(SYNC_URL)+'">'
+ +'<div class="acts"><button class="btn" id="sSave">💾 Salvar</button>'
+ +(on?'<button class="btn sec" id="sTest">🔄 Testar conexão</button><button class="btn danger" id="sOff">Desligar sync</button>':'')
+ +'<button class="btn sec" id="sClose">Fechar</button></div>'
+ +'<h4>Backend (uma vez, no servidor)</h4><div style="font-size:12px;color:var(--muted)">POST /api/sync {op, code, payload} → Maton GCAL c/ Authorization no servidor. Ops: upsert | move | cancel | remove. A chave Maton NUNCA vai pro navegador.</div>');
+ $('sClose').onclick=closeM;
+ $('sSave').onclick=()=>{localStorage.setItem('pms-sync-url',$('sUrl').value.trim());toast('🔗 Config salva — recarregando...');setTimeout(()=>location.reload(),800);};
+ const t=$('sTest');if(t)t.onclick=async()=>{toast('🔄 testando...');const r=await gcalSync('ping','TEST',{});toast(r.ok?'✅ GCAL acessível':'⚠ '+(r.err||'sem resposta'));};
+ const o=$('sOff');if(o)o.onclick=()=>{localStorage.removeItem('pms-sync-url');toast('Sync desligado — recarregando...');setTimeout(()=>location.reload(),800);};
+}
 function moveRes(code,room,date){
  const r=S.res.find(x=>x.code===code);if(!r)return;
  snap();
  if(room!==undefined)r.room=room||null;
  if(date){const n=nights(r.ci,r.co);r.ci=date;r.co=addD(date,n);}
  save();render();toast('✏️ '+r.guest+' → '+(r.room||'a definir')+' '+r.ci+'→'+r.co);
+ /* reflete no GCAL (async, sem travar a UI) */
+ gcalSync('upsert',r.code,gcalPayload(r)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');else if(x&&!x.off)toast('⚠ GCAL: '+(x.err||'falhou'));});
 }
 /* ============ HOJE ============ */
 function renderHoje(){
@@ -439,10 +517,14 @@ function openDetail(code){
   r.total=+$('mTotal').value||0;r.paid=+$('mPaid').value||0;r.guest=$('mGuest').value.trim()||r.guest;
   r.phone=$('mPhone').value.trim();r.pax=$('mPax').value.trim();r.obs=$('mObs').value.trim();
   if(r.co<=r.ci){toast('⚠ Check-out deve ser após check-in');S.hist.pop();return;}
-  save();closeM();render();toast('💾 Reserva atualizada');};
- $('mNudge').onclick=()=>{snap();r.ci=addD(r.ci,1);r.co=addD(r.co,1);save();closeM();render();toast('➡ Datas +1 dia');};
- $('mCancel').onclick=()=>{if(!confirm('Cancelar reserva de '+r.guest+'?'))return;snap();r.status='cancelada';save();closeM();render();toast('Reserva cancelada (desfazer com ↩)');};
- $('mDel').onclick=()=>{if(!confirm('EXCLUIR permanentemente '+r.guest+'?'))return;snap();S.res=S.res.filter(x=>x.code!==code);save();closeM();render();toast('Reserva excluída');};
+  save();closeM();render();toast('💾 Reserva atualizada');
+  gcalSync(r.status==='cancelada'?'cancel':'upsert',r.code,gcalPayload(r)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');else if(x&&!x.off)toast('⚠ GCAL: '+(x.err||'falhou'));});};
+ $('mNudge').onclick=()=>{snap();r.ci=addD(r.ci,1);r.co=addD(r.co,1);save();closeM();render();toast('➡ Datas +1 dia');
+  gcalSync('upsert',r.code,gcalPayload(r)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
+ $('mCancel').onclick=()=>{if(!confirm('Cancelar reserva de '+r.guest+'? (reflete no GCAL)'))return;snap();r.status='cancelada';save();closeM();render();toast('Reserva cancelada (desfazer com ↩)');
+  gcalSync('cancel',r.code,gcalPayload(r)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
+ $('mDel').onclick=()=>{if(!confirm('EXCLUIR permanentemente '+r.guest+'? (remove também do GCAL)'))return;snap();S.res=S.res.filter(x=>x.code!==code);save();closeM();render();toast('Reserva excluída');
+  gcalSync('remove',code,{}).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
 }
 function openNew(room,date){
  const ci=date||S.viewStart;
@@ -460,8 +542,10 @@ function openNew(room,date){
  $('nClose').onclick=closeM;
  $('nSave').onclick=()=>{const g=$('nGuest').value.trim();if(!g){toast('⚠ Informe o hóspede');return;}
   const c=$('nCi').value,o=$('nCo').value;if(o<=c){toast('⚠ Check-out deve ser após check-in');return;}
-  snap();S.res.push(R('DIR-'+g.replace(/[^A-Za-z]/g,'').slice(0,8).toUpperCase(),g,c,o,$('nRoom').value||null,$('nCh').value,+$('nTotal').value||0,+$('nPaid').value||0,'confirmada',$('nPax').value,{phone:$('nPhone').value.trim(),obs:$('nObs').value.trim()}));
-  save();closeM();render();toast('✅ Reserva criada');};
+  snap();const nr=R('DIR-'+g.replace(/[^A-Za-z]/g,'').slice(0,8).toUpperCase(),g,c,o,$('nRoom').value||null,$('nCh').value,+$('nTotal').value||0,+$('nPaid').value||0,'confirmada',$('nPax').value,{phone:$('nPhone').value.trim(),obs:$('nObs').value.trim()});
+  S.res.push(nr);
+  save();closeM();render();toast('✅ Reserva criada');
+  gcalSync('upsert',nr.code,gcalPayload(nr)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');else if(x&&!x.off)toast('⚠ GCAL: '+(x.err||'falhou'));});};
 }
 function openBlock(){
  openM('<h2>⛔ Bloquear quarto</h2><div class="grid2"><div><label>Quarto</label><select id="kRoom">'+roomOpts(null)+'</select></div>'
@@ -471,7 +555,8 @@ function openBlock(){
  +'<label>Motivo</label><input id="kObs" placeholder="Ex: rejunte banheiro">'
  +'<div class="acts"><button class="btn" id="kSave">⛔ Bloquear</button><button class="btn sec" id="kClose">Fechar</button></div>');
  $('kClose').onclick=closeM;
- $('kSave').onclick=()=>{snap();S.res.push(R('BLOQ-'+Date.now().toString(36).toUpperCase(),$('kT').value==='manutencao'?'🔧 Manutenção '+$('kRoom').value:'⛔ Bloqueio '+$('kRoom').value,$('kCi').value,$('kCo').value,$('kRoom').value||null,'Direta',0,0,$('kT').value,'—',{obs:$('kObs').value}));save();closeM();render();toast('Quarto bloqueado');};
+ $('kSave').onclick=()=>{snap();const br=R('BLOQ-'+Date.now().toString(36).toUpperCase(),$('kT').value==='manutencao'?'🔧 Manutenção '+$('kRoom').value:'⛔ Bloqueio '+$('kRoom').value,$('kCi').value,$('kCo').value,$('kRoom').value||null,'Direta',0,0,$('kT').value,'—',{obs:$('kObs').value});S.res.push(br);save();closeM();render();toast('Quarto bloqueado');
+  gcalSync('upsert',br.code,gcalPayload(br)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
 }
 /* ============ BUSCA ============ */
 let qT;$('q').addEventListener('input',()=>{clearTimeout(qT);qT=setTimeout(()=>{
@@ -496,6 +581,8 @@ $('bPrev').onclick=()=>{S.viewStart=addD(S.viewStart,-S.days);render();};
 $('bNext').onclick=()=>{S.viewStart=addD(S.viewStart,S.days);render();};
 $('bToday').onclick=()=>{S.viewStart=addD(todayISO(),-3);S.days=21;activateTab('ops');render();toast('📍 '+todayISO());};
 $('bUndo').onclick=undo;
+$('bBlock').onclick=()=>openBlock();
+$('bSyncCfg').onclick=()=>openSyncCfg();
 $('bNew').onclick=()=>openNew(null,null);
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>activateTab(b.dataset.tab));
 function activateTab(t){S.tab=t;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
