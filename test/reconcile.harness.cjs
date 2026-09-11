@@ -114,9 +114,8 @@ console.log('== Loop 2: dados vivos (GCAL × PMS) ==');
   eq('zero missing_in_gcal', byKind['missing_in_gcal'] || 0, 0);
   eq('zero phantom', byKind['phantom'] || 0, 0);
   eq('zero allocation_violation', byKind['allocation_violation'] || 0, 0);
-  // conflito conhecido Leticia x Almog (Q6, jan/27) — aguardando decisao do Diogo; o harness
-  // garante que ele CONTINUA detectado (se sumir sem resolucao, o diff quebrou)
-  eq('conflito conhecido Leticia/Almog segue detectado', (byKind['room_conflict'] || 0) >= 1, true);
+  // Leticia Q6 x Almog Q7 (decisao Diogo 11/set) — sem overlap; harness garante zero conflito
+  eq('zero room_conflict', byKind['room_conflict'] || 0, 0);
 
   console.log(`\nRESULT: ${pass} pass, ${fail} fail`);
   process.exit(fail ? 1 : 0);
