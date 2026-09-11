@@ -45,6 +45,14 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 .day-col.today{background:var(--teal)}
 .day-col .d{font-size:15px;font-weight:800}
 .day-col .w{font-size:10px;opacity:.8}
+.tl-head{display:block}
+.tl-head .mrow,.tl-head .drow{display:flex}
+.tl-head .mrow{background:#0f172a}
+.tl-head .mrow .room-col{background:#0f172a;color:#fcd34d;font-size:11px}
+.msegs{display:flex;flex:1}
+.mseg{padding:6px 8px;font-size:12px;font-weight:800;border-right:1px solid #374151;white-space:nowrap;overflow:hidden;color:#fcd34d}
+.day-col.mstart{box-shadow:inset 3px 0 0 #f59e0b}
+.cell.mB{background:#faf5ea}
 .lane{border-bottom:1px solid var(--line);min-height:52px}
 .lane .room-col{background:#faf9f6;font-size:12px}
 .lane .room-col small{display:block;color:var(--muted);font-weight:400}
@@ -234,6 +242,7 @@ const nights=(a,b)=>Math.round((pISO(b)-pISO(a))/86400000);
 const todayISO=()=>iso(new Date());
 const shortName=n=>n.split(' ')[0]+(n.split(' ')[1]?' '+n.split(' ')[1]:'');
 const DW=['dom','seg','ter','qua','qui','sex','sáb'];
+const MN=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._x);t._x=setTimeout(()=>t.style.display='none',2600);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function chanBadge(c){return c==='Booking'?'<span class="badge b-bkg">BKG</span>':c==='Airbnb'?'<span class="badge b-abb">ABB</span>':'<span class="badge b-dir">DIR</span>';}
@@ -290,11 +299,18 @@ function renderTL(){
  const CW=window.innerWidth<700?38:46;
  const vs=S.viewStart,ds=[];for(let i=0;i<S.days;i++)ds.push(addD(vs,i));
  const t=todayISO();
- let h='<div class="tl-head"><div class="room-col">Quarto \\ Data</div>'+ds.map(d=>{const p=pISO(d);return '<div class="day-col'+(d===t?' today':'')+'"><div class="d">'+p.getDate()+'</div><div class="w">'+DW[p.getDay()]+'</div></div>';}).join('')+'</div>';
+ // faixa de mes: agrupa dias consecutivos do mesmo mes/ano
+ let segs=[],cur=null;
+ ds.forEach(d=>{const p=pISO(d),k=p.getFullYear()+'-'+p.getMonth();
+  if(!cur||cur.k!==k){cur={k,y:p.getFullYear(),m:p.getMonth(),n:0,first:d};segs.push(cur);}cur.n++;});
+ const visLabel=segs.map(s=>MN[s.m].slice(0,3)+' '+String(s.y).slice(2)).join('  →  ');
+ let h='<div class="tl-head"><div class="mrow"><div class="room-col">📅 '+visLabel+'</div><div class="msegs">'
+  +segs.map(s=>'<div class="mseg" style="width:'+(s.n*CW)+'px;min-width:'+(s.n*CW)+'px">'+MN[s.m]+' '+s.y+'</div>').join('')+'</div></div>'
+  +'<div class="drow"><div class="room-col">Quarto \\ Data</div>'+ds.map(d=>{const p=pISO(d);const ms=d.slice(8)==='01'?' mstart':'';return '<div class="day-col'+(d===t?' today':'')+ms+'"><div class="d">'+p.getDate()+'</div><div class="w">'+DW[p.getDay()]+'</div></div>';}).join('')+'</div></div>';
  ROOMS.forEach(rm=>{
   const list=filtered().filter(r=>String(r.room)===String(rm.id));
   h+='<div class="lane" data-room="'+(rm.id||'')+'"><div class="room-col">'+esc(rm.name)+(rm.cat!=='—'?'<small>'+esc(rm.cat)+' · '+rm.cap+' pax</small>':'')+'</div><div class="days" id="lane-'+(rm.id||'NULL')+'">';
-  ds.forEach(d=>{h+='<div class="cell'+(d===t?' today':'')+'" data-room="'+(rm.id||'')+'" data-date="'+d+'"></div>';});
+  ds.forEach(d=>{const mb=pISO(d).getMonth()%2?' mB':'';h+='<div class="cell'+(d===t?' today':'')+mb+'" data-room="'+(rm.id||'')+'" data-date="'+d+'"></div>';});
   list.forEach(r=>{
    if(r.co<=vs||r.ci>=addD(vs,S.days))return;
    const a=r.ci<vs?vs:r.ci,b=r.co>addD(vs,S.days)?addD(vs,S.days):r.co;
