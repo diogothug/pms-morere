@@ -67,6 +67,9 @@ export default async function handler(req, res) {
   if (!process.env.MATON_API_KEY) return res.status(200).json({ ok: false, err: 'MATON_API_KEY nao configurada no Vercel' });
 
   const { op, code, payload = {} } = req.body || {};
+  // trava de segurança: códigos de teste nunca criam evento real
+  if (/^(SYNC-|TEST|DUMMY)/i.test(code || '') && op !== 'ping')
+    return res.status(200).json({ ok: false, err: 'codigo de teste bloqueado' });
   try {
     if (op === 'ping') {
       const { st } = await maton('GET', BASE + '?maxResults=1&singleEvents=true');
