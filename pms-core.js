@@ -4,9 +4,11 @@
 const PMSCore = (() => {
 
   const ROOM_ALIASES = [
-    [/q3|peguari/i, 'Q3'], [/q4|lagosta/i, 'Q4'], [/q5|xar[eé]u/i, 'Q5'],
-    [/q6|budi[aã]o|deluxe.*vista|vista.*mar/i, 'Q6'], [/q7/i, 'Q7'], [/q8|bangal[oô]/i, 'Q8'],
-    [/q2/i, 'Q2'], [/q9|mirante/i, 'Q9']
+    // Q explícito tem prioridade sobre nome (ex "Q2 (Bangalo 2)" é Q2, não Q8)
+    [/q2(?![0-9])/i, 'Q2'], [/q3(?![0-9])/i, 'Q3'], [/q4(?![0-9])/i, 'Q4'], [/q5(?![0-9])/i, 'Q5'],
+    [/q6(?![0-9])/i, 'Q6'], [/q7(?![0-9])/i, 'Q7'], [/q8(?![0-9])/i, 'Q8'], [/q9|mirante/i, 'Q9'],
+    [/peguari/i, 'Q3'], [/lagosta/i, 'Q4'], [/xar[eé]u/i, 'Q5'],
+    [/budi[aã]o|deluxe.*vista|vista.*mar/i, 'Q6'], [/bangal[oô]/i, 'Q8']
   ];
   // códigos GCAL legados que mapeiam p/ código PMS diferente
   const CODE_ALIASES = { 'MANUAL': 'DIR-TATIANE' };
@@ -27,8 +29,11 @@ const PMSCore = (() => {
     if (s == null) return null;
     let t = String(s).trim();
     if (/a combinar|pendente|aguardando|^\s*$|—|^-$/.test(t)) return null;
+    // parêntese explicativo: "R$ 0 (sinal unico...)" / "R$ 3.340,00 (1/2 do total...)" → só o valor
+    t = t.split('(')[0].trim();
     t = t.replace(/R\$\s*/g, '').trim();
-    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    // "9.100" / "3.340" sem centavos = milhar (padrão GCAL); com ",xx" = decimal BR
+    if (/,/.test(t)) t = t.replace(/\./g, '').replace(',', '.');
     else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
     const v = parseFloat(t);
     return isFinite(v) ? v : null;
@@ -41,7 +46,8 @@ const PMSCore = (() => {
   }
 
   function fld(desc, name) {
-    const m = new RegExp('^' + name + '\\s*:\\s*(.+)$', 'im').exec(desc || '');
+    // GCAL usa " | " como separador inline: "Codigo: X | Plataforma: ..." — captura até o pipe
+    const m = new RegExp('^' + name + '\\s*:\\s*([^|\\n\\r]+)', 'im').exec(desc || '');
     return m ? m[1].trim() : '';
   }
 
@@ -62,7 +68,7 @@ const PMSCore = (() => {
     const summary = e.summary || '';
     const parts = summary.split('—').map(s => s.trim());
     // código: description "Codigo:" (novo) ou inline "Código: X | Hóspede:" (GCAL antigo) ou summary (fallback)
-    let code = fld(d, 'C[oó]digo').split('|')[0].trim() || parts[1] || '';
+    let code = fld(d, 'C[oó]digo') || parts[1] || '';
     code = code.split('|')[0].trim();
     if (CODE_ALIASES[code]) code = CODE_ALIASES[code];
     // multi-room: "(1/2)" → -a, "(2/2)" → -b
@@ -72,6 +78,9 @@ const PMSCore = (() => {
     if (suffix && code && !/-a$|-b$/.test(code)) code = code + suffix;
     const guest = gcalGuest(d, parts);
     const suiteText = fld(d, 'Suite') || parts[2] || '';
+    // Raissa (grupo): "Valor: R$ 5.500,00 total (2 quartos)" → total do GRUPO, não por membro.
+    // O PMS rateia (2750 cada); o diff de grupo já cobre a checagem — não comparar por membro.
+    const isGroupValue = /total\s*\(\s*2\s*quartos\s*\)/i.test(d);
     let plat = fld(d, 'Plataforma') || '';
     plat = /booking/i.test(plat) ? 'Booking' : /airbnb/i.test(plat) ? 'Airbnb' : (plat ? 'Direta' : '');
     const s = e.start || {}, en = e.end || {};
@@ -79,7 +88,7 @@ const PMSCore = (() => {
     const co = (en.date || String(en.dateTime || '').slice(0, 10));
     return {
       id: e.id, code, guest, ci, co,
-      room: suiteToRoom(suiteText), suiteText,
+      room: suiteToRoom(suiteText), suiteText, groupValue: isGroupValue,
       channel: plat, total: parseBRL(fld(d, 'Valor total') || fld(d, 'Valor')),
       paid: parseBRL(fld(d, 'Sinal pago') || fld(d, 'Pago')),
       pax: fld(d, 'Pax'),
@@ -154,9 +163,14 @@ const PMSCore = (() => {
         D({ kind: 'room_missing_pms', code, msg: `${r.guest}: GCAL ${gr}, PMS sem quarto`, pms: { room: null }, gcal: { room: gr } });
       else if (pr && gr && pr !== gr)
         D({ kind: 'room_mismatch', code, msg: `${r.guest}: PMS ${pr} vs GCAL ${gr}`, pms: { room: pr }, gcal: { room: gr } });
-      if (fold(r.guest) !== fold(g.guest) && g.guest)
+      // nome: tolera "(nome a confirmar)", sufixo "(2a reserva)" e abreviação "A." vs "Alves"
+      const fg = fold(r.guest).replace(/\s*\(.*?\)\s*/g, '').trim(), gg = fold(g.guest).replace(/\s*\(.*?\)\s*/g, '').trim();
+      const tokensG = gg.split(' ').filter(t => t.length > 1 && !/^(a|de|da|do|dos|e)$/.test(t));
+      const guestSame = fg === gg || (gg && fg.startsWith(gg)) || (gg && gg.startsWith(fg)) ||
+        tokensG.length > 1 && tokensG.every(t => fg.includes(t) || fg.split(' ').some(w => w.startsWith(t[0]) && Math.abs(w.length - t.length) <= 4));
+      if (!guestSame && g.guest)
         D({ kind: 'guest_mismatch', code, msg: `Nome: PMS "${r.guest}" vs GCAL "${g.guest}"`, pms: { guest: r.guest }, gcal: { guest: g.guest } });
-      if (r.total != null && g.total != null && Math.abs(r.total - g.total) > 0.5)
+      if (r.total != null && g.total != null && !g.groupValue && Math.abs(r.total - g.total) > 0.5)
         D({ kind: 'value_mismatch', code, msg: `Valor: PMS R$${r.total} vs GCAL R$${g.total}`, pms: { total: r.total }, gcal: { total: g.total } });
       if (r.paid != null && g.paid != null && Math.abs(r.paid - g.paid) > 0.5)
         D({ kind: 'paid_mismatch', code, msg: `Sinal: PMS R$${r.paid} vs GCAL R$${g.paid}`, pms: { paid: r.paid }, gcal: { paid: g.paid } });
