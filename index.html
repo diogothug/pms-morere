@@ -234,7 +234,22 @@ async function gcalSync(op,code,payload){
   return await r.json();
  }catch(e){return {ok:false,err:String(e)};}
 }
-/* suite -> texto curto p/ summary do GCAL */
+/* Regra de alocação Booking (definida por Diogo 11/set/2026):
+   "3, 4 e 5" / suite dupla / suite padrão → Q3 (Peguari); se cheio → Q4 (Lagosta); se ambos cheios → Q5 (Xaréu).
+   Exceção: Q4 em manutenção até 15/10/2026 → nesse período fallback é Q3→Q5.
+   Deluxe vista-mar → Q6. Bangalô → Q8.
+   alocarQuarto() é usada pelo botão "⚙ auto-alocar" no detalhe de reservas sem quarto. */
+const Q4_MANUT_FIM='2026-10-15';
+function q4BloqueadoEm(ci,co){return ci<Q4_MANUT_FIM&&co>'2026-09-22';}
+function quartoOcupado(room,ci,co,ignore){
+ return S.res.some(x=>x.code!==ignore&&x.room===room&&!['cancelada','checkout','bloqueio','manutencao'].includes(x.status)&&x.ci<co&&ci<x.co);
+}
+function alocarQuarto(r){
+ const std=['Q3','Q4','Q5'];
+ const pool=q4BloqueadoEm(r.ci,r.co)?['Q3','Q5']:std;
+ for(const q of pool)if(!quartoOcupado(q,r.ci,r.co,r.code))return q;
+ return null;
+}
 function suiteShort(s){return {Q2:'Q2',Q3:'Q3 Peguari',Q4:'Q4',Q5:'Q5',Q6:'Q6 Budião',Q7:'Q7',Q8:'Q8 Bangalô',Q9:'Q9'}[s]||s||'A definir';}
 function R(code,guest,ci,co,room,channel,total,paid,status,pax,extra){
   return Object.assign({code,guest,phone:'',ci,co,room,channel,total,paid:paid||0,
@@ -245,27 +260,27 @@ function SEED(){return [
  /* Fonte: GCAL mestre 11/set/2026 (48 eventos) + sinais em reservas.md/wiki */
  R('5276958152','Theresa Holl','2026-08-28','2026-09-04','Q6','Booking',1860,0,'checkout','2 adultos',{}),
  R('5966461908','Diego Souza Oliveira','2026-08-31','2026-09-09','Q5','Booking',612.04,800,'checkout','1 adulto',{obs:'Estendida. Extensão direta +R$800 RECEBIDO 09/09.'}),
- R('5372297171','Guizei Oliveira','2026-08-31','2026-09-04',null,'Booking',254.33,84,'checkout','1 adulto',{obs:'Extensão Pix R$84.'}),
+ R('5372297171','Guizei Oliveira','2026-08-31','2026-09-04','Q3','Booking',254.33,84,'checkout','1 adulto',{obs:'Extensão Pix R$84. Alocada Q3 (regra 3-4-5).'}),
  R('5077689913','Jamile Santana Lima','2026-09-04','2026-09-07','Q8','Booking',816,0,'checkout','2 adultos',{}),
- R('5833390567','Julio Francisco','2026-09-05','2026-09-07',null,'Booking',507.50,0,'checkout','2 adultos',{}),
+ R('5833390567','Julio Francisco','2026-09-05','2026-09-07','Q3','Booking',507.50,0,'checkout','2 adultos',{obs:'Alocado Q3 (regra 3-4-5).'}),
  R('5624842510','Lennart Kocheise','2026-09-07','2026-09-10','Q8','Booking',1020,0,'checkout','2 adultos + 2 crianças',{}),
- R('6550233808','Bruna Naiane A. Santos','2026-09-10','2026-09-15',null,'Booking',597.80,0,'hospedado','2 adultos',{phone:'71999900011',obs:'Café incluso (Booking). Quarto físico a confirmar.',eta:'15h',cleaning:'Limpo · check-in feito'}),
+ R('6550233808','Bruna Naiane A. Santos','2026-09-10','2026-09-15','Q3','Booking',597.80,0,'hospedado','2 adultos',{phone:'71999900011',obs:'Café incluso (Booking). Alocada Q3 (regra 3-4-5).',eta:'15h',cleaning:'Limpo · check-in feito'}),
  R('6438756876','Augusto Rinque','2026-09-15','2026-09-18','Q8','Booking',816,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
  R('DIR-AMIGOPAI','Amigo do pai (a confirmar)','2026-09-19','2026-09-27','Q2','Direta',1350,0,'pre','A confirmar',{obs:'Diária R$150 x 9. Sinal a combinar. Café incluso (manual).'}),
  R('6322042906','João Ricardo C. Barbedo','2026-09-19','2026-09-23','Q8','Booking',1088,0,'confirmada','2 adultos',{obs:'Q8 Bangalô. Café incluso.'}),
  R('DIR-GRAZIELX','Graziella Xavier de Barros','2026-09-21','2026-09-28','Q6','Direta',1650,650,'confirmada','2 adultos',{phone:'71988800022',obs:'CPF + email no GCAL. Saldo R$1000 no check-in.',pay:'PIX'}),
  R('DIR-TATIANE','Tatiane','2026-09-25','2026-09-28','Q8','Direta',660,330,'confirmada','3 pessoas',{obs:'Sinal R$330 ✅. Saldo R$330 no check-in.',pay:'PIX'}),
- R('5553787235','Sofia Lobianco','2026-09-29','2026-10-05',null,'Booking',1501.68,0,'confirmada','2 adultos',{obs:'6 noites. Quarto físico a definir na chegada.'}),
- R('6758535376','Luiza Oliveira','2026-09-30','2026-10-02',null,'Booking',481.36,0,'confirmada','2 adultos',{}),
+ R('5553787235','Sofia Lobianco','2026-09-29','2026-10-05','Q3','Booking',1501.68,0,'confirmada','2 adultos',{obs:'6 noites. Alocada Q3 (regra 3-4-5).'}),
+ R('6758535376','Luiza Oliveira','2026-09-30','2026-10-02','Q5','Booking',481.36,0,'confirmada','2 adultos',{obs:'Alocada Q5 (Q3 ocupada p/ Sofia; Q4 em manutenção até 15/10).'}),
  R('6133651414','Pedro Henrique A. Santos','2026-10-08','2026-10-11','Q8','Booking',888,0,'confirmada','2 adultos',{}),
  R('5919780696','Camille Prado','2026-10-10','2026-10-16','Q6','Booking',1608.84,0,'confirmada','1 adulto',{obs:'Q6 Budião (deluxe).'}),
- R('5643277374','André Loch','2026-10-15','2026-10-19',null,'Booking',957,0,'confirmada','2 adultos',{}),
- R('5350099465','Miranda Veronica','2026-10-16','2026-10-20',null,'Booking',838.12,0,'confirmada','2 adultos',{}),
- R('6833220672','Noémie Breysach','2026-10-27','2026-10-31',null,'Booking',760,0,'confirmada','2 adultos',{}),
- R('5666636994','Suzana Dantas Ferreira','2026-10-31','2026-11-02',null,'Booking',478.63,0,'confirmada','2 adultos',{}),
- R('5540340133','Mauricio Moura','2026-10-31','2026-11-02',null,'Booking',372.40,0,'confirmada','2 adultos',{}),
+ R('5643277374','André Loch','2026-10-15','2026-10-19','Q3','Booking',957,0,'confirmada','2 adultos',{obs:'Alocado Q3 (regra 3-4-5).'}),
+ R('5350099465','Miranda Veronica','2026-10-16','2026-10-20','Q4','Booking',838.12,0,'confirmada','2 adultos',{obs:'Alocada Q4 (Q3 ocupada p/ André; manutenção Q4 termina 15/10).'}),
+ R('6833220672','Noémie Breysach','2026-10-27','2026-10-31','Q3','Booking',760,0,'confirmada','2 adultos',{obs:'Alocada Q3 (regra 3-4-5).'}),
+ R('5666636994','Suzana Dantas Ferreira','2026-10-31','2026-11-02','Q3','Booking',478.63,0,'confirmada','2 adultos',{obs:'Alocada Q3 (regra 3-4-5).'}),
+ R('5540340133','Mauricio Moura','2026-10-31','2026-11-02','Q4','Booking',372.40,0,'confirmada','2 adultos',{obs:'Alocado Q4 (Q3 ocupada p/ Suzana no mesmo período).'}),
  R('5340616788','Tainá Piton','2026-11-18','2026-11-20','Q6','Booking',614,0,'confirmada','2 adultos',{obs:'Q6 Budião.'}),
- R('6144914949','Flávia Barbosa','2026-11-22','2026-11-27',null,'Booking',1395,0,'confirmada','2 adultos',{obs:'Quarto tipo 3,4,5 — alocar na chegada.'}),
+ R('6144914949','Flávia Barbosa','2026-11-22','2026-11-27','Q3','Booking',1395,0,'confirmada','2 adultos',{obs:'Quarto tipo 3,4,5. Alocada Q3 (regra 3-4-5).'}),
  R('6137444344','Roberta Tabajara','2026-12-26','2027-01-02','Q5','Booking',8032.50,0,'confirmada','2 adultos',{obs:'🎆 Réveillon grupo 3 casais.'}),
  R('6840967150','Mariah Caon Gentil','2026-12-26','2027-01-02','Q6','Booking',8400,0,'confirmada','2 adultos',{obs:'🎆 Réveillon.'}),
  R('6912465115','Vinicius Rocha','2026-12-26','2027-01-02','Q4','Booking',7560,0,'confirmada','2 adultos',{obs:'🎆 Réveillon.'}),
@@ -279,21 +294,21 @@ function SEED(){return [
  R('5033914795','Almog Azari','2027-01-03','2027-01-06','Q8','Booking',1350,0,'confirmada','2 adultos',{obs:'Bangalô com vista mar.'}),
  R('5118172753','Almog Azari','2027-01-03','2027-01-07','Q6','Booking',2800,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar.'}),
  R('6628256918','Kahena Corcini Nantes','2027-01-08','2027-01-12','Q8','Booking',2464,0,'confirmada','2 adultos',{obs:'Tarifa Genius.'}),
- R('6499845521','Laura Ehui','2027-01-09','2027-01-12','Q6','Booking',1650,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar.'}),
+ R('6499845521','Laura Ehui','2027-01-09','2027-01-12','Q6','Booking',1650,0,'confirmada','2 adultos',{obs:'Quarto Duplo Deluxe vista mar → Q6 (regra Deluxe).'}),
  R('DIR-ROBLEDOF-a','Robledo de Freitas','2027-01-14','2027-01-18','Q6','Direta',3340,3340,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 1/2). Sinal R$3340 (50%) cartão ✅. Saldo R$3340 no check-in. CPF no GCAL.',pay:'Cartão'}),
  R('DIR-ROBLEDOF-b','Robledo de Freitas','2027-01-14','2027-01-18','Q7','Direta',3340,0,'confirmada','2 quartos (Q6+Q7)',{obs:'Total R$6680 (2 quartos 2/2). Sinal lançado em (1/2) — não somar.',pay:'Cartão'}),
  R('6655509099-a','Maria Cristiana S V Pereira','2027-01-16','2027-01-20','Q8','Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 1/2).'}),
- R('6655509099-b','Maria Cristiana S V Pereira','2027-01-16','2027-01-20',null,'Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 2/2). Quarto físico a definir.'}),
+ R('6655509099-b','Maria Cristiana S V Pereira','2027-01-16','2027-01-20','Q4','Booking',2360.80,0,'confirmada','4 adultos + 1 criança',{obs:'Total R$4721.60 (2 quartos 2/2). Alocada Q4 (regra 3-4-5; Q3 ocupada p/ DIR-RAISSAVO? não — RAISSAVO sai 07/jan; Q4 livre).'}),
  R('DIR-GEMMINAF','Gemmina','2027-01-19','2027-01-28','Q6','Direta',4500,2250,'confirmada','2 adultos',{obs:'Argentina. Sinal R$2250 (50%) Pix ✅. Saldo R$2250 no check-in (reais/Pix/cartão — NÃO aceitar dólar espécie). Transfer no GCAL.',pay:'PIX'}),
- R('5046956112','Mariana Mazzini','2027-01-26','2027-01-29',null,'Booking',1051.89,0,'confirmada','1 adulto',{}),
- R('6773189787','Martha Slade','2027-01-29','2027-02-02',null,'Booking',3019,0,'confirmada','2 adultos',{}),
+ R('5046956112','Mariana Mazzini','2027-01-26','2027-01-29','Q3','Booking',1051.89,0,'confirmada','1 adulto',{obs:'Alocada Q3 (regra 3-4-5).'}),
+ R('6773189787','Martha Slade','2027-01-29','2027-02-02','Q3','Booking',3019,0,'confirmada','2 adultos',{obs:'Alocada Q3 (regra 3-4-5).'}),
  R('5286029133-a','Martin Joecke','2027-02-20','2027-02-22','Q6','Booking',1325.90,0,'confirmada','2 adultos',{obs:'2 quartos (1/2). Valor total no GCAL.'}),
- R('5286029133-b','Martin Joecke','2027-02-20','2027-02-22',null,'Booking',0,0,'confirmada','2 adultos',{obs:'2 quartos (2/2). Valor lançado em (1/2) — não somar.'}),
- R('5271276885-a','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',2542.50,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (1/2). Total wiki R$2542.50 (1x duplo + 1x deluxe vista-mar).'}),
- R('5271276885-b','Enrico Vasconcelos','2027-02-22','2027-02-25',null,'Booking',0,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (2/2). Valor lançado em (1/2) — não somar.'}),
+ R('5286029133-b','Martin Joecke','2027-02-20','2027-02-22','Q3','Booking',0,0,'confirmada','2 adultos',{obs:'2 quartos (2/2): Q3 p/ regra 3-4-5. Valor lançado em (1/2) — não somar.'}),
+ R('5271276885-a','Enrico Vasconcelos','2027-02-22','2027-02-25','Q3','Booking',2542.50,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (1/2): Q3. Total wiki R$2542.50 (1x duplo + 1x deluxe vista-mar).'}),
+ R('5271276885-b','Enrico Vasconcelos','2027-02-22','2027-02-25','Q4','Booking',0,0,'confirmada','3 adultos',{obs:'2x Quarto Duplo (2/2): Q4. Valor lançado em (1/2) — não somar.'}),
  R('DIR-NINASANT','Nina Santanna','2027-03-06','2027-03-13','Q3','Direta',1260,0,'pre','A confirmar',{obs:'R$180/dia x 7 noites. Sinal R$630 (50%) PENDENTE. Via Instagram. Café ✅.'}),
  R('OLIVIA-07','Olivia Gasparello','2026-07-18','2026-07-21','Q3','Direta',360,360,'checkout','1 adulto',{obs:'Sinal R$180 + saldo R$180 pagos.',pay:'PIX'}),
- R('BLOQ-Q4SET','🔧 Manutenção Q4','2026-09-22','2026-09-24','Q4','Direta',0,0,'manutencao','—',{obs:'Rejunte banheiro + dedetização.'}),
+ R('BLOQ-Q4MANUT','🔧 Q4 em manutenção','2026-09-22','2026-10-15','Q4','Direta',0,0,'manutencao','—',{obs:'Q4 Lagosta fora de operação até 15/10. Regra 3-4-5 usa Q3→Q5 nesse período.'}),
  R('BLOQ-Q7','Q7 uso próprio (Diogo)','2026-09-01','2026-12-20','Q7','Direta',0,0,'bloqueio','—',{obs:'Quarto do Diogo. Alugável a partir de 20/dez/26.'})
 ];}
 /* ============ ESTADO ============ */
@@ -493,7 +508,9 @@ function openDetail(code){
  const n=nights(r.ci,r.co);
  openM('<h2>'+STATUS[r.status].i+' '+esc(r.guest)+'</h2><div style="color:var(--muted);font-size:12px">'+r.code+' · '+r.channel+' · '+n+' noite(s)</div>'
  +'<h4>Hóspede</h4><div>📞 '+esc(r.phone||'—')+' · 👥 '+esc(r.pax)+'<br>📝 '+esc(r.obs||'—')+'</div>'
- +'<h4>Estadia</h4><div>🛏 '+(r.room?esc(r.room):'⚠ a definir')+' · '+r.ci+' → '+r.co+' ('+n+' noites)<br>⏰ chegada prevista: '+esc(r.eta||'15h padrão')+' · 🧹 '+esc(r.cleaning)+'</div>'
+ +'<h4>Quarto</h4><div>🛏 '+(r.room?esc(r.room):'⚠ a definir')+' · '+r.ci+' → '+r.co+' ('+n+' noites)'
+ +(!r.room?'<br><button class="btn sec" id="mAuto" style="margin-top:6px">⚙ Auto-alocar (regra 3→4→5)</button>':'')
+ +'<br>⏰ chegada prevista: '+esc(r.eta||'15h padrão')+' · 🧹 '+esc(r.cleaning)+'</div>'
  +'<h4>Financeiro</h4><div>💰 Total '+BRL(r.total)+' · ✅ Pago '+BRL(r.paid)+' · ⏳ Saldo <b>'+BRL(saldo(r))+'</b><br>💳 '+esc(r.pay)+'</div>'
  +'<h4>Editar</h4>'
  +'<div class="grid2"><div><label>Status</label><select id="mStatus">'+Object.keys(STATUS).map(k=>'<option value="'+k+'"'+(r.status===k?' selected':'')+'>'+STATUS[k].l+'</option>').join('')+'</select></div>'
@@ -512,6 +529,11 @@ function openDetail(code){
  +'<button class="btn danger" id="mDel">🗑 Excluir</button>'
  +'<button class="btn sec" id="mClose">Fechar</button></div>');
  $('mClose').onclick=closeM;
+ const bA=$('mAuto');
+ if(bA)bA.onclick=()=>{const q=alocarQuarto(r);
+  if(!q){toast('⚠ Q3/Q4/Q5 lotados no período — alocar manual');return;}
+  snap();r.room=q;save();closeM();render();toast('⚙ '+r.guest+' → '+q);
+  gcalSync('upsert',r.code,gcalPayload(r)).then(x=>{if(x&&x.ok)toast('📅 GCAL atualizado');});};
  $('mSave').onclick=()=>{snap();
   r.status=$('mStatus').value;r.room=$('mRoom').value||null;r.ci=$('mCi').value;r.co=$('mCo').value;
   r.total=+$('mTotal').value||0;r.paid=+$('mPaid').value||0;r.guest=$('mGuest').value.trim()||r.guest;
