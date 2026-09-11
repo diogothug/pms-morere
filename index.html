@@ -222,14 +222,15 @@ const GCAL_IDS={
  '5286029133-a':['j67pq91rj1u7ds2t28qgmgdmbs'],'5286029133-b':['ml4lac39usnki07c6boc41inco'],
  '5271276885-a':['jesli4tal5i0482duh2h9aapqk'],'DIR-NINASANT':['vpcqc4k7iaraeg8va4unv6qs4k']
 };
-/* === SYNC GCAL (via backend proprio — chave Maton NUNCA no frontend) ===
-   Backend: POST /api/sync {op, code, payload} → proxy c/ Authorization.
-   Sem backend configurado o PMS funciona 100% local (sync desabilitado). */
-const SYNC_URL=(localStorage.getItem('pms-sync-url')||'').replace(/\/$/,'');
-function syncOn(){return !!SYNC_URL;}
+/* === SYNC GCAL (serverless /api/sync no mesmo dominio — chave Maton NUNCA no frontend) ===
+   POST /api/sync {op, code, payload} → Maton GCAL c/ Authorization no servidor.
+   Ops: upsert | move | cancel | remove | ping. Funciona out-of-the-box no deploy Vercel. */
+const SYNC_URL='';  // mesmo dominio: fetch relativo (sobrescrito por config manual abaixo)
+function syncBase(){return (localStorage.getItem('pms-sync-url')||'').replace(/\/$/,'');}
+function syncOn(){return true;}  // /api/sync existe no proprio deploy
 async function gcalSync(op,code,payload){
- if(!syncOn())return {ok:false,off:true};
- try{const r=await fetch(SYNC_URL+'/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+ const base=syncBase();  // vazio = mesmo dominio; ou URL externa p/ dev local
+ try{const r=await fetch(base+'/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({op,code,payload})});
   return await r.json();
  }catch(e){return {ok:false,err:String(e)};}
@@ -438,17 +439,16 @@ function gcalPayload(r){
 function openSyncCfg(){
  const on=syncOn();
  openM('<h2>🔗 Sincronização Google Calendar</h2>'
- +'<div style="font-size:13px;color:var(--muted)">Status: '+(on?'<b style="color:green">● ATIVA</b>':'<b style="color:#999">○ local (sem sync)</b>')+'</div>'
- +'<p style="font-size:13px">Toda alteração de reserva no PMS (criar, mover, editar, cancelar, excluir) '+(on?'<b>reflete automaticamente no GCAL</b>':'<b>vai refletir no GCAL</b> assim que o backend for ligado')+'. Sem backend, o PMS funciona 100% local.</p>'
- +'<label>URL do backend de sync (ex: https://seu-backend/api)</label><input id="sUrl" placeholder="https://..." value="'+esc(SYNC_URL)+'">'
+ +'<div style="font-size:13px;color:var(--muted)">Status: '+(on?'<b style="color:green">● ATIVA</b>':'<b style="color:#999">○ verificando…</b>')+' <span id="sPing"></span></div>'
+ +'<p style="font-size:13px">Toda alteração de reserva no PMS (criar, mover, editar, cancelar, excluir) <b>reflete automaticamente no GCAL</b>. O sync roda na função <code>/api/sync</code> do próprio deploy — sem servidor externo.</p>'
+ +'<label>Backend alternativo (dev local — vazio = próprio deploy)</label><input id="sUrl" placeholder="(vazio)" value="'+esc(syncBase())+'">'
  +'<div class="acts"><button class="btn" id="sSave">💾 Salvar</button>'
- +(on?'<button class="btn sec" id="sTest">🔄 Testar conexão</button><button class="btn danger" id="sOff">Desligar sync</button>':'')
- +'<button class="btn sec" id="sClose">Fechar</button></div>'
- +'<h4>Backend (uma vez, no servidor)</h4><div style="font-size:12px;color:var(--muted)">POST /api/sync {op, code, payload} → Maton GCAL c/ Authorization no servidor. Ops: upsert | move | cancel | remove. A chave Maton NUNCA vai pro navegador.</div>');
+ +'<button class="btn sec" id="sTest">🔄 Testar conexão</button>'
+ +'<button class="btn sec" id="sClose">Fechar</button></div>');
  $('sClose').onclick=closeM;
- $('sSave').onclick=()=>{localStorage.setItem('pms-sync-url',$('sUrl').value.trim());toast('🔗 Config salva — recarregando...');setTimeout(()=>location.reload(),800);};
- const t=$('sTest');if(t)t.onclick=async()=>{toast('🔄 testando...');const r=await gcalSync('ping','TEST',{});toast(r.ok?'✅ GCAL acessível':'⚠ '+(r.err||'sem resposta'));};
- const o=$('sOff');if(o)o.onclick=()=>{localStorage.removeItem('pms-sync-url');toast('Sync desligado — recarregando...');setTimeout(()=>location.reload(),800);};
+ $('sSave').onclick=()=>{localStorage.setItem('pms-sync-url',$('sUrl').value.trim());toast('🔗 Config salva');closeM();render();};
+ $('sTest').onclick=async()=>{toast('🔄 testando...');const r=await gcalSync('ping','TEST',{});toast(r.ok?'✅ GCAL acessível':'⚠ '+(r.err||'sem resposta'));};
+ gcalSync('ping','TEST',{}).then(r=>{const el=$('sPing');if(el)el.textContent=r.ok?'— GCAL acessível ✅':'— '+(r.err||'sem resposta');});
 }
 function moveRes(code,room,date){
  const r=S.res.find(x=>x.code===code);if(!r)return;
